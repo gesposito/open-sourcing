@@ -7,6 +7,26 @@ Check a live repository with `bun src/cli.ts repo-check owner/repo`. Apply the b
 rulesets with `bun src/cli.ts rulesets` (dry run by default; templates are in
 [`templates/rulesets/`](../templates/rulesets/)).
 
+## Plan availability
+
+Several controls depend on the GitHub plan when the repository is **private**. Public
+repositories get all of them on every plan. Source: GitHub Docs, checked 2026-11-01
+([rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets),
+[environments](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)).
+
+| Control | Public repo | Private repo |
+| --- | --- | --- |
+| Repo rulesets (REPO-03…05, REL-06) | all plans | Pro, Team, Enterprise |
+| Org rulesets (REPO-06) | Team, Enterprise | Team, Enterprise |
+| Environments, environment secrets, deployment branches (REL-05, GHA-06) | all plans | Pro, Team, Enterprise |
+| Required reviewers, wait timers (REL-05) | all plans | Enterprise only |
+| Custom deployment protection rules (REL-07) | all plans | Enterprise only |
+
+In practice, a private repo on GitHub Free can't enforce the REPO and REL rulesets or the
+release gate. Apply them after making the repo public, as part of the open-sourcing
+checklist, and don't rely on them before then. `oss repo-check` reports these as
+`– unavailable` rather than failing.
+
 ### REPO-01: Keep privileged accounts to a minimum (MUST)
 
 *Source: [Astral]*

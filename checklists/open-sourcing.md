@@ -20,7 +20,10 @@ regularly afterwards. Each item links to the rule that explains *why*.
 
 ## 2. Repository and org settings: `oss repo-check <owner/repo>` has no ✗
 
-Run this with an admin token, or the admin-only checks come back as `?`.
+Run this with an admin token, or the admin-only checks come back as `?`. On a private
+repo with GitHub Free, rulesets and the release gate show as `–` (unavailable). Apply them
+right after the repo goes public (see
+[plan availability](../guidelines/repository-and-org.md#plan-availability)).
 
 - [ ] Owners and admins reviewed and minimized ([REPO-01]) *(manual)*
 - [ ] Org requires 2FA, TOTP or stronger ([REPO-02])
