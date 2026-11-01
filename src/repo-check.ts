@@ -1,7 +1,8 @@
 import type { Api } from "./gh.ts";
 import { color } from "./report.ts";
 
-export type Status = "pass" | "fail" | "warn" | "unknown";
+/** `unavailable`: the feature is gated by the GitHub plan / repo visibility. */
+export type Status = "pass" | "fail" | "warn" | "unknown" | "unavailable";
 
 export interface CheckResult {
   id: string;
@@ -152,9 +153,18 @@ function coversAllTags(rs: Ruleset): boolean {
 }
 
 async function checkRules(api: Api, base: string, defaultBranch: string, envName: string, isAdmin: boolean, add: (id: string, g: string, s: Status, m: string) => void) {
+  // Rulesets are plan-gated: GitHub Free returns 403 for private repos.
+  const probe = await api<unknown>(`${base}/rulesets?includes_parents=true&per_page=100`);
+  if (probe.status === 403) {
+    const why = (probe.data as Obj | null)?.message ?? "Rulesets are not available for this repository.";
+    for (const [id, g] of [["default-branch-ruleset", "REPO-03"], ["blocked-branches", "REPO-04"], ["immutable-tags", "REPO-05"], ["tag-requires-release", "REL-06"]] as const)
+      add(id, g, "unavailable", `Rulesets unavailable: ${why}`);
+    return;
+  }
+
   const types = async (branch: string) => {
     const r = await api<{ type: string; ruleset_source_type?: string }[]>(`${base}/rules/branches/${branch.split("/").map(encodeURIComponent).join("/")}`);
-    return r.data ?? [];
+    return Array.isArray(r.data) ? r.data : [];
   };
 
   // REPO-03
@@ -171,9 +181,9 @@ async function checkRules(api: Api, base: string, defaultBranch: string, envName
   }
 
   // Tag rulesets: REPO-05, REL-06, REPO-06
-  const list = await api<Ruleset[]>(`${base}/rulesets?includes_parents=true&per_page=100`);
-  if (list.status !== 200 || !list.data) {
-    add("immutable-tags", "REPO-05", "unknown", "Could not list rulesets.");
+  const list = probe as { status: number; data: Ruleset[] | null };
+  if (list.status !== 200 || !Array.isArray(list.data)) {
+    add("immutable-tags", "REPO-05", "unknown", `Could not list rulesets (HTTP ${list.status}).`);
     return;
   }
   const details: Ruleset[] = [];
@@ -207,13 +217,16 @@ const ICON: Record<Status, string> = {
   fail: color.red("✗"),
   warn: color.yellow("!"),
   unknown: color.dim("?"),
+  unavailable: color.yellow("–"),
 };
 
 export function formatChecks(slug: string, results: CheckResult[]): string {
   const lines = [color.bold(`Repository settings: ${slug}`), ""];
   for (const r of results) lines.push(`  ${ICON[r.status]} ${color.dim(r.guideline.padEnd(8))} ${r.message}`);
   const n = (s: Status) => results.filter((r) => r.status === s).length;
-  lines.push("", `${n("pass")} passed, ${n("fail")} failed, ${n("warn")} warning(s), ${n("unknown")} unknown.`);
+  lines.push("", `${n("pass")} passed, ${n("fail")} failed, ${n("warn")} warning(s), ${n("unknown")} unknown, ${n("unavailable")} unavailable.`);
   if (n("unknown")) lines.push(color.dim("Unknown checks need admin (or org owner) access with the gh token."));
+  if (n("unavailable"))
+    lines.push(color.dim("Unavailable: private repos need GitHub Pro/Team/Enterprise for rulesets and environments; required reviewers and custom protection rules on private repos need Enterprise. Public repos get all of them on every plan."));
   return lines.join("\n");
 }

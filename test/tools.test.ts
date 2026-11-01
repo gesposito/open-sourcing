@@ -189,6 +189,27 @@ describe("repo-check", () => {
     expect(status["org-2fa"]).toBeUndefined();
   });
 
+  test("plan-gated rulesets (GitHub Free + private repo) are unavailable, not a crash", async () => {
+    const gated = { status: 403, data: { message: "Upgrade to GitHub Pro or make this repository public to enable this feature." } };
+    const results = await repoCheck(
+      fakeApi({
+        ...happy,
+        [`${base}/rulesets?includes_parents=true&per_page=100`]: gated,
+        [`${base}/rules/branches/main`]: gated,
+      }),
+      { owner: "acme", repo: "lib" },
+    );
+    const rs = results.filter((r) => ["REPO-03", "REPO-04", "REPO-05", "REL-06"].includes(r.guideline));
+    expect(rs.length).toBe(4);
+    expect(rs.every((r) => r.status === "unavailable" && r.message.includes("Upgrade to GitHub Pro"))).toBe(true);
+  });
+
+  test("plan surfaces the API's reason when rulesets can't be listed", async () => {
+    const api = fakeApi({ "repos/o/r/rulesets?includes_parents=true&per_page=100": { status: 403, data: { message: "Upgrade to GitHub Pro" } } });
+    const scope = { kind: "repo" as const, owner: "o", repo: "r" };
+    expect(planRulesets(api, scope, renderRulesets({ scope }))).rejects.toThrow("Upgrade to GitHub Pro");
+  });
+
   test("approval delegated to a deployment-protection App passes (REL-07)", async () => {
     const results = await repoCheck(
       fakeApi({

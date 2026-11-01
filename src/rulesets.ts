@@ -69,7 +69,10 @@ function endpoint(scope: Scope): string {
 export async function planRulesets(api: Api, scope: Scope, payloads: RulesetPayload[]): Promise<PlanItem[]> {
   const query = scope.kind === "repo" ? "?includes_parents=true&per_page=100" : "?per_page=100";
   const res = await api<{ id: number; name: string; source_type?: string }[]>(`${endpoint(scope)}${query}`);
-  if (res.status !== 200 || !res.data) throw new Error(`Could not list rulesets at ${endpoint(scope)} (HTTP ${res.status}). Admin access is required.`);
+  if (res.status !== 200 || !Array.isArray(res.data)) {
+    const msg = (res.data as { message?: string } | null)?.message;
+    throw new Error(`Could not list rulesets at ${endpoint(scope)} (HTTP ${res.status})${msg ? `: ${msg}` : ""}`);
+  }
   // For a repo, only its own rulesets can be updated; inherited org rulesets of the same name are left alone.
   const own = new Map(res.data.filter((r) => scope.kind === "org" || r.source_type !== "Organization").map((r) => [r.name, r.id]));
   const inherited = new Set(scope.kind === "repo" ? res.data.filter((r) => r.source_type === "Organization").map((r) => r.name) : []);
