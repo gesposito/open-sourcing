@@ -1,0 +1,23 @@
+# DEP-01 automated updates (Actions included, so SHA pins stay fresh)
+# DEP-02 cooldown: don't propose versions younger than 7 days.
+#        Security updates are not delayed by cooldown.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Add one entry per ecosystem in the repo, each with a cooldown, e.g.:
+  # - package-ecosystem: npm        # or bun, pip, uv, cargo, gomod, docker, ...
+  #   directory: /
+  #   schedule:
+  #     interval: weekly
+  #   cooldown:
+  #     default-days: 7
+  #     exclude: ["@your-org/*"]    # relax cooldown for first-party packages
